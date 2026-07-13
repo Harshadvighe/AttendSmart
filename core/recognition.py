@@ -48,6 +48,9 @@ SIMILARITY_THRESHOLD = 0.42
 
 BLUR_THRESHOLD = 75.0   # Laplacian variance; below this = too blurry
 
+LIVENESS_THRESHOLD = 3.0
+LIVENESS_REQUIRED_FRAMES = 3
+
 # ─── Lazy-loaded model instances ──────────────────────────────────────────────
 _detector   = None
 _recognizer = None
@@ -287,6 +290,7 @@ def recognize_face(img_bgr: np.ndarray, all_embeddings: dict) -> dict:
             "name":          best_name,
             "confidence":    confidence,
             "face_detected": True,
+            "aligned_face":  aligned,
         }
 
     return {
@@ -294,6 +298,7 @@ def recognize_face(img_bgr: np.ndarray, all_embeddings: dict) -> dict:
         "name":          None,
         "confidence":    confidence,
         "face_detected": True,
+        "aligned_face":  aligned if 'aligned' in locals() else None,
     }
 
 

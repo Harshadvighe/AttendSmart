@@ -41,6 +41,8 @@ import threading
 import functools
 from pathlib import Path
 from datetime import date, datetime
+import cv2
+import numpy as np
 
 from flask import Flask, request, jsonify, render_template, send_file, abort, Response, session, redirect, url_for
 from flask_cors import CORS
@@ -56,6 +58,8 @@ _embeddings_cache: dict = {}
 _cache_lock = threading.Lock()
 _active_sessions: dict = {}
 _session_lock = threading.Lock()
+_liveness_states: dict = {}
+_liveness_lock = threading.Lock()
 
 # ─── Auth Decorators ──────────────────────────────────────────────────────────
 def login_required(f):
@@ -105,6 +109,76 @@ def _initialize_active_sessions():
 
 
 _initialize_active_sessions()
+
+
+def _check_liveness(class_id, student_name, aligned_face):
+    """
+    Verify liveness of the detected face by comparing the current aligned face
+    with the previously saved one.
+    Returns: (is_live, message, liveness_score_or_none)
+    """
+    global _liveness_states
+    now = time.time()
+    threshold = recognition.LIVENESS_THRESHOLD
+    required_frames = recognition.LIVENESS_REQUIRED_FRAMES
+
+    if aligned_face is None:
+        return False, "No face detail for liveness check.", None
+
+    with _liveness_lock:
+        if class_id not in _liveness_states:
+            _liveness_states[class_id] = {}
+
+        student_records = _liveness_states[class_id]
+
+        # Clean up old records (older than 10 seconds)
+        expired = [name for name, rec in student_records.items() if now - rec["last_seen"] > 10.0]
+        for name in expired:
+            del student_records[name]
+
+        if student_name not in student_records:
+            # First time seeing this student in this sequence
+            student_records[student_name] = {
+                "last_aligned": aligned_face,
+                "valid_count": 1,
+                "last_seen": now
+            }
+            return False, "Verifying liveness... please keep moving slightly.", None
+
+        record = student_records[student_name]
+        last_seen = record["last_seen"]
+
+        # Reset count if last frame was too long ago
+        if now - last_seen > 3.0:
+            record["valid_count"] = 1
+            record["last_aligned"] = aligned_face
+            record["last_seen"] = now
+            return False, "Verifying liveness... please keep moving slightly.", None
+
+        prev_aligned = record["last_aligned"]
+
+        try:
+            gray_curr = cv2.cvtColor(aligned_face, cv2.COLOR_BGR2GRAY)
+            gray_prev = cv2.cvtColor(prev_aligned, cv2.COLOR_BGR2GRAY)
+            mae = float(np.mean(cv2.absdiff(gray_curr, gray_prev)))
+        except Exception:
+            mae = 0.0
+
+        record["last_aligned"] = aligned_face
+        record["last_seen"] = now
+
+        # If the MAE is too small, it's a static photo!
+        if mae < threshold:
+            record["valid_count"] = max(1, record["valid_count"] - 1)
+            return False, f"Static photo detected (Liveness score: {mae:.2f} < {threshold}). Please present a live face.", mae
+
+        # Frame passed liveness check
+        record["valid_count"] += 1
+
+        if record["valid_count"] >= required_frames:
+            return True, f"Liveness verified (Liveness score: {mae:.2f} >= {threshold}).", mae
+
+        return False, f"Verifying liveness ({record['valid_count']}/{required_frames})...", mae
 
 
 # ─── Page Routes ──────────────────────────────────────────────────────────────
@@ -576,6 +650,32 @@ def api_attendance_mark():
                 "message":       f"Student belongs to {student_class}-{student_div}, not {session_class}-{session_div}.",
                 "confidence":    result["confidence"],
             })
+
+        # Check if already marked first
+        already_marked = False
+        with _session_lock:
+            for rec in session["records"]:
+                if rec["name"] == name:
+                    if rec["status"] in ("present", "late"):
+                        already_marked = True
+                    break
+
+        if not already_marked:
+            aligned_face = result.get("aligned_face")
+            is_live, liveness_message, mae_score = _check_liveness(class_id, name, aligned_face)
+            if not is_live:
+                status_val = "spoof_detected" if mae_score is not None and mae_score < recognition.LIVENESS_THRESHOLD else "verifying_liveness"
+                return jsonify({
+                    "success":       True,
+                    "recognized":    True,
+                    "face_detected": True,
+                    "marked":        False,
+                    "alreadyMarked": False,
+                    "name":          name,
+                    "status":        status_val,
+                    "message":       liveness_message,
+                    "confidence":    result["confidence"],
+                })
 
         with _session_lock:
             start_str = session.get("startTime", "00:00:00")
@@ -1143,6 +1243,21 @@ def api_student_mark_attendance():
                 "success": False,
                 "error": "Face does not match the logged-in student."
             }), 403
+
+        # Check if already marked first
+        already_marked = False
+        with _session_lock:
+            for rec in session_obj["records"]:
+                if rec["name"] == recognized_name:
+                    if rec["status"] in ("present", "late"):
+                        already_marked = True
+                    break
+
+        if not already_marked:
+            aligned_face = result.get("aligned_face")
+            is_live, liveness_message, mae_score = _check_liveness(class_id, recognized_name, aligned_face)
+            if not is_live:
+                return jsonify({"success": False, "error": liveness_message}), 400
 
         now = datetime.now()
         with _session_lock:

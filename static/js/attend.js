@@ -338,6 +338,10 @@ function handleResult(data) {
   if (sessionActive && data.marked !== undefined) {
     if (data.status === "wrong_class") {
       showToast(data.message || `⚠️ ${name} does not belong to this class section.`, "warning");
+    } else if (data.status === "verifying_liveness") {
+      // Don't show toast to prevent spamming
+    } else if (data.status === "spoof_detected") {
+      showToast(data.message || `❌ Spoof attempt blocked for ${name}!`, "error");
     } else {
       refreshRollFromSession();
       if (data.marked && !data.alreadyMarked) {
@@ -391,6 +395,20 @@ function showRecognized(data) {
       recCard?.classList.remove("state-present", "state-already");
       recCard?.classList.add("state-unknown");
       if (recName) recName.textContent = data.message || "Does not belong here";
+    } else if (status === "verifying_liveness") {
+      recStatusBadge.textContent = "Verifying Liveness";
+      recStatusBadge.classList.add("badge-blue");
+      recCard?.classList.remove("state-present", "state-already");
+      recCard?.classList.add("state-unknown");
+      if (recName) recName.textContent = `${name} (Verifying...)`;
+      if (recMarkedAt) recMarkedAt.textContent = data.message || "";
+    } else if (status === "spoof_detected") {
+      recStatusBadge.textContent = "Spoof Blocked";
+      recStatusBadge.classList.add("badge-red");
+      recCard?.classList.remove("state-present", "state-already");
+      recCard?.classList.add("state-unknown");
+      if (recName) recName.textContent = `${name} (Static Photo)`;
+      if (recMarkedAt) recMarkedAt.textContent = data.message || "";
     } else if (already) {
       recStatusBadge.textContent = "Already Marked";
       recStatusBadge.classList.add("badge-info");
@@ -410,7 +428,7 @@ function showRecognized(data) {
   }
 
   if (recMarkedAt && data.markedAt) recMarkedAt.textContent = `Marked at ${data.markedAt}`;
-  else if (recMarkedAt) recMarkedAt.textContent = "";
+  else if (recMarkedAt && status !== "verifying_liveness" && status !== "spoof_detected") recMarkedAt.textContent = "";
 }
 
 // ─── Roll Table ───────────────────────────────────────────────
