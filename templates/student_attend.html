@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AttendSmart — Mark Attendance</title>
+<link rel="stylesheet" href="/static/css/style.css"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>"/>
+<style>
+.scan-layout{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;align-items:start}
+@media(max-width:860px){.scan-layout{grid-template-columns:1fr}}
+.status-alert{padding:14px 18px;border-radius:var(--r-lg);font-weight:600;text-align:center;margin-bottom:12px;font-size:.875rem}
+.sa-info   {background:var(--blue-dim);color:var(--blue);border:1px solid rgba(37,99,235,.25)}
+.sa-success{background:var(--green-dim);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.sa-error  {background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+</style>
+</head>
+<body>
+<div style="min-height:100vh;background:var(--bg)">
+  <!-- Minimal nav -->
+  <header class="topbar" style="position:sticky;top:0;z-index:90;margin-left:0">
+    <a href="/student_dashboard" class="flex items-center gap-2" style="text-decoration:none">
+      <div style="width:28px;height:28px;background:var(--blue);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:.9rem">🎓</div>
+      <span class="fw-6" style="color:var(--txt)">AttendSmart</span>
+    </a>
+    <span class="tb-spacer"></span>
+    <span class="badge badge-blue">Student Portal</span>
+    <button class="icon-btn theme-btn" aria-label="Toggle theme"><svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"></svg></button>
+    <a href="/logout" class="btn btn-ghost btn-sm">Sign Out</a>
+  </header>
+
+  <main style="max-width:900px;margin:0 auto;padding:24px 16px">
+    <div class="page-header">
+      <div class="page-title" id="sessionTitle">Verify Face Attendance</div>
+      <div class="page-sub" id="sessionSubtitle">Class: … | Teacher: …</div>
+    </div>
+
+    <div class="scan-layout">
+      <!-- Camera -->
+      <div>
+        <div class="card card-p0" style="overflow:hidden;border-radius:var(--r-xl)">
+          <div class="webcam-wrap" id="webcamWrapper" style="position:relative;overflow:hidden;aspect-ratio:4/3">
+            <video id="webcamVideo" class="webcam-video" autoplay playsinline muted></video>
+            <canvas id="webcamCanvas" class="webcam-canvas"></canvas>
+            <div class="webcam-overlay">
+              <div class="face-ring" id="faceRing"></div>
+              <div class="scan-line" id="scanLine"></div>
+            </div>
+          </div>
+          <div class="cam-controls">
+            <button class="btn btn-primary btn-sm" id="startCamBtn" onclick="startWebcam()">Start Camera</button>
+            <span class="text-xs text-muted" id="camStatus">Camera is off</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status panel -->
+      <div class="flex-col gap-4">
+        <div class="status-alert sa-info" id="statusAlert">Please start your camera and look directly at the screen.</div>
+
+        <div class="card card-sm">
+          <div class="fw-6 text-sm mb-3">How it works</div>
+          <ol style="padding-left:18px;color:var(--muted);font-size:.8125rem;display:flex;flex-direction:column;gap:8px">
+            <li>Click <strong>Start Camera</strong> and allow access</li>
+            <li>Position your face clearly in the center</li>
+            <li>The system will automatically recognize and mark you</li>
+            <li>You'll be redirected back to your dashboard</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script>
+  /* inline theme (no sidebar.js on this page's layout) */
+  (function(){
+    const r=document.documentElement,s=localStorage.getItem('theme')||'dark';
+    r.setAttribute('data-theme',s);
+    const SUN='<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>';
+    const MOON='<path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+    function si(t){document.querySelectorAll('.theme-icon').forEach(e=>{e.innerHTML=t==='dark'?SUN:MOON});}
+    si(s);
+    document.addEventListener('click',e=>{if(e.target.closest('.theme-btn')){const n=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',n);localStorage.setItem('theme',n);si(n);}});
+  })();
+
+  const p=new URLSearchParams(window.location.search);
+  const classId=p.get('class_id'),token=p.get('token');
+  let videoStream=null,scanInterval=null,isMarked=false;
+
+  function showToast(msg,type='info'){
+    const c=document.getElementById('toastContainer');
+    const t=document.createElement('div');
+    t.className=`toast toast-${type}`;
+    t.innerHTML=`<span class="toast-icon">${type==='success'?'✓':'✕'}</span><span>${msg}</span>`;
+    c.appendChild(t);setTimeout(()=>{t.classList.add('removing');setTimeout(()=>t.remove(),260)},4200);
+  }
+
+  function setAlert(msg,type='info'){
+    const a=document.getElementById('statusAlert');
+    a.className=`status-alert sa-${type}`;a.textContent=msg;
+  }
+
+  async function loadSessionDetails(){
+    if(!classId||!token){showToast('Missing authorization parameters','error');setTimeout(()=>{window.location.href='/'},2000);return;}
+    try{
+      const r=await fetch(`/api/student/session_details?class_id=${classId}`),d=await r.json();
+      if(d.success){
+        document.getElementById('sessionTitle').textContent=`Attendance for ${d.session.subject}`;
+        document.getElementById('sessionSubtitle').textContent=`${d.session.classId} · ${d.session.class}-${d.session.div} · Teacher: ${d.session.teacher}`;
+      }
+    }catch{}
+  }
+
+  async function startWebcam(){
+    const btn=document.getElementById('startCamBtn');
+    try{
+      videoStream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
+      document.getElementById('webcamVideo').srcObject=videoStream;
+      btn.disabled=true;
+      document.getElementById('camStatus').textContent='Camera active — scanning…';
+      document.getElementById('scanLine').classList.add('on');
+      setAlert('Scanning face… please hold still.','info');
+      scanInterval=setInterval(captureAndRecognize,1000);
+    }catch{showToast('Could not access camera. Please allow permission.','error');}
+  }
+
+  function stopWebcam(){
+    if(videoStream)videoStream.getTracks().forEach(t=>t.stop());
+    clearInterval(scanInterval);
+    document.getElementById('scanLine').classList.remove('on');
+  }
+
+  async function captureAndRecognize(){
+    if(isMarked)return;
+    const video=document.getElementById('webcamVideo');
+    const canvas=document.createElement('canvas');
+    canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+    canvas.getContext('2d').drawImage(video,0,0);
+    const b64=canvas.toDataURL('image/jpeg');
+    try{
+      const res=await fetch('/api/student/mark_attendance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({classId,token,image:b64})});
+      const d=await res.json();
+      if(d.success&&d.marked){
+        isMarked=true;stopWebcam();
+        setAlert(`✓ Attendance marked ${d.status.toUpperCase()} (Confidence: ${Math.round(d.confidence*100)}%)`, 'success');
+        showToast('Attendance marked successfully!','success');
+        setTimeout(()=>{window.location.href='/student_dashboard'},3000);
+      }else if(d.success&&d.alreadyMarked){
+        isMarked=true;stopWebcam();
+        setAlert('Already Marked Present!','success');
+        setTimeout(()=>{window.location.href='/student_dashboard'},3000);
+      }else if(d.error){
+        setAlert(d.error,'error');
+      }else if(!d.recognized){
+        setAlert('Scanning… face not recognized yet. Please adjust position.','info');
+      }
+    }catch{}
+  }
+
+  document.addEventListener('DOMContentLoaded',loadSessionDetails);
+  window.addEventListener('beforeunload',stopWebcam);
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AttendSmart — Reports</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=1.4) }}"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>"/>
+<style>
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;align-items:end}
+.reports-scroll{overflow-x:auto;max-height:520px;overflow-y:auto}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  {% set active_page='reports' %}{% include '_sidebar.html' %}
+  <div class="main-content">
+    {% set page_title='Attendance Reports' %}{% include '_topbar.html' %}
+    <main class="page-body">
+      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div><div class="page-title">Attendance Reports</div><div class="page-sub">Filter, search and export attendance records</div></div>
+        <button class="btn btn-success btn-sm" id="exportBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Export CSV
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <div class="card card-sm mb-5">
+        <div class="fw-6 text-sm mb-3">Filter Records</div>
+        <div class="filter-grid">
+          <div class="form-group"><label class="form-label">Date From</label><input class="form-control" type="date" id="fDateFrom"/></div>
+          <div class="form-group"><label class="form-label">Date To</label><input class="form-control" type="date" id="fDateTo"/></div>
+          <div class="form-group"><label class="form-label">Class / Subject</label>
+            <select class="form-control" id="fClass"><option value="">All Classes</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Student Name</label><input class="form-control" id="fStudent" placeholder="Type to filter…"/></div>
+          <div class="form-group"><label class="form-label">Status</label>
+            <select class="form-control" id="fStatus">
+              <option value="">All Statuses</option>
+              <option value="present">Present</option>
+              <option value="late">Late</option>
+              <option value="absent">Absent</option>
+            </select>
+          </div>
+          <div class="form-group"><button class="btn btn-primary w-full" id="applyFiltersBtn">Apply Filters</button></div>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary-row">
+        <div class="sum-card"><div class="sum-val" id="sumTotal">—</div><div class="sum-lbl">Total Records</div></div>
+        <div class="sum-card"><div class="sum-val text-green" id="sumPresent">—</div><div class="sum-lbl">Present</div></div>
+        <div class="sum-card"><div class="sum-val text-amber" id="sumLate">—</div><div class="sum-lbl">Late</div></div>
+        <div class="sum-card"><div class="sum-val text-red" id="sumAbsent">—</div><div class="sum-lbl">Absent</div></div>
+        <div class="sum-card"><div class="sum-val text-blue" id="sumPct">—</div><div class="sum-lbl">Att. Rate</div></div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <div class="table-toolbar justify-between">
+          <span class="fw-6 text-sm">Records <span class="text-muted fw-5" id="recordRangeText"></span></span>
+          <div class="input-wrap" style="width:210px">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="form-control" id="tableSearch" placeholder="Quick search…"/>
+          </div>
+        </div>
+        <div class="reports-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th><th>Subject</th><th>Class</th><th>Student</th>
+                <th>ID</th><th>Roll</th><th>Status</th><th>Marked At</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="reportsBody">
+              <tr><td colspan="9" class="text-center text-muted" style="padding:3rem">Apply filters to load records</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Edit Record Modal -->
+<div class="modal-overlay hidden" id="editModal">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <div class="modal-title">Edit Attendance Record</div>
+      <button class="modal-close" id="closeEditModalBtn">✕</button>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px;margin-bottom:16px">
+      <div class="fw-6 text-sm" id="editModalName">—</div>
+      <div class="text-xs text-muted" id="editModalMeta">—</div>
+    </div>
+    <div class="form-group mb-4">
+      <label class="form-label">New Status</label>
+      <div class="flex gap-2 mt-1">
+        <button class="btn btn-sm flex-1 status-pick-btn" data-status="present" style="background:var(--green-dim);color:var(--green);border:2px solid rgba(16,185,129,.3)">✓ Present</button>
+        <button class="btn btn-sm flex-1 status-pick-btn" data-status="late"    style="background:var(--amber-dim);color:var(--amber);border:2px solid rgba(245,158,11,.3)">⏐ Late</button>
+        <button class="btn btn-sm flex-1 status-pick-btn" data-status="absent"  style="background:var(--red-dim);color:var(--red);border:2px solid rgba(239,68,68,.3)">✕ Absent</button>
+      </div>
+    </div>
+    <div class="modal-footer" style="padding-top:0;border-top:none;margin-top:0">
+      <button class="btn btn-ghost btn-sm" id="closeEditModalBtn2">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="saveEditRecordBtn">Save Change</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+<script src="{{ url_for('static', filename='js/reports.js', v=1.4) }}"></script>
+</body>
+</html>

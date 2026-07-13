@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AttendSmart — Student Dashboard</title>
+<link rel="stylesheet" href="/static/css/style.css"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>"/>
+<style>
+.profile-hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);padding:24px 28px;margin-bottom:24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;position:relative;overflow:hidden}
+.profile-hero::after{content:'';position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(37,99,235,.06) 0%,transparent 70%);pointer-events:none}
+.profile-photo{width:80px;height:80px;border-radius:var(--r-xl);object-fit:cover;border:2px solid var(--border);flex-shrink:0}
+.profile-name{font-size:1.25rem;font-weight:700;color:var(--txt)}
+.profile-meta{font-size:.8125rem;color:var(--muted);margin-top:3px}
+.session-card{background:var(--surface);border:1px solid rgba(16,185,129,.35);border-radius:var(--r-xl);padding:18px 20px;background:var(--green-dim);display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Student sidebar (minimal) -->
+  <div class="sb-overlay" id="sbOverlay"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-header">
+      <div class="sb-brand-icon">🎓</div>
+      <span class="sb-brand-name">AttendSmart</span>
+      <button class="sb-toggle" id="sbToggle" aria-label="Toggle sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    <nav class="sb-nav">
+      <a href="/student_dashboard" class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="nav-label">My Dashboard</span>
+      </a>
+    </nav>
+    <div class="sb-footer">
+      <a href="/logout" class="nav-item danger">
+        <svg class="nav-icon" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        <span class="nav-label">Sign Out</span>
+      </a>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <button class="mobile-menu-btn" id="sbMobileBtn" aria-label="Open menu"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <span class="tb-title">Student Portal</span>
+      <span class="tb-spacer"></span>
+      <button class="icon-btn theme-btn" aria-label="Toggle theme"><svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"></svg></button>
+      <div class="dropdown">
+        <button class="user-pill" id="userBtn">
+          <div class="u-avatar">{{ (session.get('user','S') or 'S')[0].upper() }}</div>
+          <span class="u-name">{{ session.get('user','') }}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="dropdown-menu hidden" id="userMenu">
+          <div class="dropdown-head"><div class="fw-6 text-sm">{{ session.get('name','') }}</div><div class="text-xs text-muted">Student</div></div>
+          <a href="/logout" class="dropdown-item danger"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7"/></svg>Sign Out</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-body">
+      <!-- Profile Hero -->
+      <div class="profile-hero">
+        <img id="studentPhoto" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%231E293B'/><text x='50%' y='55%' font-size='32' text-anchor='middle' fill='%2364748B'>👤</text></svg>" alt="Profile" class="profile-photo"/>
+        <div>
+          <div class="profile-name" id="studentName">Loading…</div>
+          <div class="profile-meta" id="studentInfo">Student ID: … | Roll No: …</div>
+          <div class="profile-meta" id="studentDept">Department: … | Class: … | Div: …</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-icon si-blue"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div><div class="stat-val" id="statAtt">0%</div><div class="stat-label">Attendance Rate</div></div>
+        <div class="stat-card"><div class="stat-icon si-green"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div><div class="stat-val" id="statPresent">0</div><div class="stat-label">Present</div></div>
+        <div class="stat-card"><div class="stat-icon si-amber"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="stat-val" id="statLate">0</div><div class="stat-label">Late</div></div>
+        <div class="stat-card"><div class="stat-icon si-red"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><div class="stat-val" id="statAbsent">0</div><div class="stat-label">Absent</div></div>
+      </div>
+
+      <!-- Active Sessions -->
+      <div class="fw-6 text-base mb-3">🔔 Active Attendance Sessions</div>
+      <div id="activeSessionsContainer">
+        <div class="card text-center text-muted" style="padding:2rem">Checking for active sessions…</div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Passcode Modal -->
+<div class="modal-overlay hidden" id="passcodeModal">
+  <div class="modal-box modal-sm">
+    <div class="modal-header"><div class="modal-title">Enter Session Passcode</div><button class="modal-close" onclick="closePasscodeModal()">✕</button></div>
+    <form onsubmit="verifyPasscode(event)">
+      <input type="hidden" id="passcodeClassId"/>
+      <div class="form-group mb-4">
+        <label class="form-label">Passcode</label>
+        <input class="form-control" id="sessionPasscode" required placeholder="Code shared by teacher" style="text-align:center;font-size:1.25rem;letter-spacing:.1em"/>
+      </div>
+      <div class="modal-footer" style="padding-top:0;border-top:none;margin-top:0">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closePasscodeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Proceed to Face Scan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="/static/js/sidebar.js"></script>
+<script>
+function showToast(msg,type='info'){window.showToast&&window.showToast(msg,type)}
+async function loadStudentData(){
+  try{
+    const r=await fetch('/api/student/dashboard_data'),d=await r.json();
+    if(!d.success){showToast(d.error||'Failed to load data','error');return;}
+    const p=d.profile;
+    document.getElementById('studentName').textContent=p.name;
+    document.getElementById('studentInfo').textContent=`Student ID: ${p.studentId} | Roll No: ${p.rollNo}`;
+    document.getElementById('studentDept').textContent=`Department: ${p.department} | Class: ${p.class} | Div: ${p.div}`;
+    document.getElementById('studentPhoto').src=`/api/students/${encodeURIComponent(p.name)}/photo`;
+    const s=d.stats;
+    document.getElementById('statAtt').textContent=`${s.pct}%`;
+    document.getElementById('statPresent').textContent=s.present;
+    document.getElementById('statLate').textContent=s.late;
+    document.getElementById('statAbsent').textContent=s.absent;
+    renderSessions(d.active_sessions,`${p.class}-${p.div}`);
+  }catch(e){showToast('Error loading dashboard','error');}
+}
+function renderSessions(sessions,sec){
+  const c=document.getElementById('activeSessionsContainer');
+  if(!sessions||!sessions.length){c.innerHTML=`<div class="card text-center text-muted" style="padding:2rem">No active sessions for class ${sec}.</div>`;return;}
+  c.innerHTML=sessions.map(s=>`
+    <div class="session-card mb-3">
+      <div>
+        <div class="flex items-center gap-2 mb-1"><span class="dot dot-live"></span><span class="fw-7 text-green">Live Attendance</span></div>
+        <div class="fw-6">${s.subject} — Class: ${s.class} Div: ${s.div}</div>
+        <div class="text-xs text-muted mt-1">Teacher: ${s.teacher} · Started ${s.startTime}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openPasscodeModal('${s.classId}')">Mark Attendance</button>
+    </div>`).join('');
+}
+function openPasscodeModal(classId){
+  document.getElementById('passcodeClassId').value=classId;
+  document.getElementById('sessionPasscode').value='';
+  document.getElementById('passcodeModal').classList.remove('hidden');
+}
+function closePasscodeModal(){document.getElementById('passcodeModal').classList.add('hidden');}
+async function verifyPasscode(e){
+  e.preventDefault();
+  const classId=document.getElementById('passcodeClassId').value;
+  const passcode=document.getElementById('sessionPasscode').value.trim();
+  try{
+    const r=await fetch('/api/student/verify_passcode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({classId,passcode})});
+    const d=await r.json();
+    if(d.success){window.location.href=`/student_attend?class_id=${classId}&token=${d.token}`;}
+    else{showToast(d.error||'Invalid passcode','error');}
+  }catch{showToast('Error verifying passcode','error');}
+}
+document.addEventListener('DOMContentLoaded',loadStudentData);
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# ── Python 3.13 compatible — all pre-built wheels, no C compiler needed ──
+Flask==3.0.3
+flask-cors==4.0.1
+opencv-python          # Includes YuNet face detector + SFace recognizer (ONNX)
+numpy>=2.0.0           # 2.x has Python 3.13 pre-built wheels
+Pillow>=10.0.0
+scipy>=1.0.0
+requests               # For one-time model weight download (~38 MB total)
+openpyxl>=3.1.0        # For Excel/CSV attendance report export

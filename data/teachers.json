@@ -1,0 +1,19 @@
+{
+  "admin": {
+    "password_hash": "scrypt:32768:8:1$pR8eKPtMGjskwSyQ$a4dbaab3121bfa8ed0d6ebe745b476e79b2d2ad4b5b6caf3c784b546c5d49c12449f5acb29ce42d775e668ca66a6c1b4b78eaee044170fe3038d8056e47f7365",
+    "name": "Admin Teacher",
+    "role": "admin",
+    "assigned_classes": []
+  },
+  "ROHIT": {
+    "password_hash": "scrypt:32768:8:1$ZM9GifHZm9gJY6Uc$d7eb3d36f02957a2ca906260e61fd869bc4b27ad021a6cb7d6a289b53250a97ae18b4824ab920077a1e4d77193ec3a10ca402ff73d561d0ec1146170f39af3ca",
+    "name": "ROHIT",
+    "role": "teacher",
+    "assigned_classes": [
+      "101-math-d-a",
+      "101-math-fy-a",
+      "math-fy-b",
+      "fg-fy-a"
+    ]
+  }
+}

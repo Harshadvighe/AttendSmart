@@ -1,0 +1,16 @@
+[
+  {
+    "subject": "MATH",
+    "class": "FY",
+    "div": "B",
+    "code": "FY-B",
+    "id": "math-fy-b"
+  },
+  {
+    "subject": "fg",
+    "class": "FY",
+    "div": "A",
+    "code": "FY-A",
+    "id": "fg-fy-a"
+  }
+]

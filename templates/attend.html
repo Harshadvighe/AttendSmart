@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AttendSmart — Take Attendance</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='1.4') }}"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📷</text></svg>"/>
+<style>
+.attend-layout{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start}
+@media(max-width:1100px){.attend-layout{grid-template-columns:1fr}}
+.cam-sticky{position:sticky;top:80px}
+.setup-fields{display:flex;flex-direction:column;gap:14px}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  {% set active_page='attend' %}{% include '_sidebar.html' %}
+  <div class="main-content">
+    {% set page_title='Take Attendance' %}{% include '_topbar.html' %}
+    <main class="page-body">
+
+      <!-- Session Banner -->
+      <div class="session-banner" id="sessionBanner">
+        <div class="flex items-center gap-3">
+          <span class="dot" id="sessionDot"></span>
+          <div>
+            <div class="fw-6" id="sessionLabel">No Active Session</div>
+            <div class="text-xs text-muted" id="sessionMeta">Start a session to begin marking attendance</div>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm" id="newSessionBtn">Start Session</button>
+          <button class="btn btn-danger btn-sm hidden" id="endSessionBtn">End Session</button>
+        </div>
+      </div>
+
+      <div class="attend-layout">
+        <!-- Camera column -->
+        <div class="cam-sticky">
+          <div class="card card-p0" style="overflow:hidden;border-radius:var(--r-xl)">
+            <div class="webcam-wrap" id="webcamWrapper">
+              <video id="webcamVideo" class="webcam-video" autoplay playsinline muted></video>
+              <canvas id="webcamCanvas" class="webcam-canvas"></canvas>
+              <div class="webcam-overlay">
+                <div class="face-ring" id="faceBracket"></div>
+                <div class="scan-line" id="scanLine"></div>
+                <div class="cam-corner cc-tl"></div><div class="cam-corner cc-tr"></div>
+                <div class="cam-corner cc-bl"></div><div class="cam-corner cc-br"></div>
+              </div>
+              <div class="cam-badge cam-badge-tr">OFFLINE AI</div>
+              <span class="cam-badge cam-badge-tl hidden" id="liveBadge"><span class="dot-live" style="display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px"></span>LIVE</span>
+            </div>
+            <div class="cam-controls">
+              <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm" id="startCamBtn">Start Camera</button>
+                <button class="btn btn-secondary btn-sm hidden" id="stopCamBtn">Stop</button>
+              </div>
+              <span class="text-xs text-muted" id="statusText">Camera not started</span>
+            </div>
+            <div class="status-strip">
+              <div class="status-item"><span class="s-dot" id="camDot"></span>Camera</div>
+              <div class="status-item"><span class="s-dot" id="faceDot"></span>Face</div>
+              <div class="status-item"><span class="s-dot" id="recDot"></span>Recognized</div>
+              <div class="status-item" style="margin-left:auto">Conf: <span id="confDisplay" class="fw-6 text-green ml-1">—</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right panel -->
+        <div class="flex-col gap-4">
+          <!-- Recognition card -->
+          <div class="rec-card state-idle" id="recognitionCard">
+            <div id="stateIdle" class="text-center" style="padding:20px 0">
+              <div style="font-size:2.2rem;opacity:.3;margin-bottom:8px">👁️</div>
+              <div class="fw-6 text-muted">Scanning for faces…</div>
+              <p class="text-xs text-muted mt-2">Start a session, then start the camera</p>
+            </div>
+            <div class="hidden" id="stateRecognized">
+              <div class="flex items-center gap-3 mb-3">
+                <img id="recAvatar" src="" alt="" class="rec-avatar"/>
+                <div class="flex-1">
+                  <div class="fw-7 text-base" id="recName">—</div>
+                  <div class="text-xs text-muted" id="recStudentId"></div>
+                  <span class="badge badge-green mt-1" id="recStatusBadge">Present</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-muted mb-1">
+                <span>Confidence</span>
+                <div class="conf-bar flex-1"><div class="conf-fill" id="confidenceBar" style="width:0%"></div></div>
+                <span class="fw-6" id="confidencePct">0%</span>
+              </div>
+              <div class="text-xs text-muted" id="recMarkedAt"></div>
+            </div>
+            <div class="hidden text-center" id="stateUnknown" style="padding:16px 0">
+              <div style="font-size:2rem;margin-bottom:8px">❓</div>
+              <div class="fw-7" style="color:var(--red)">Unknown Student</div>
+              <p class="text-xs text-muted mt-1">Face not enrolled. <a href="/register">Enroll them →</a></p>
+            </div>
+          </div>
+
+          <!-- Roll counters -->
+          <div class="roll-counters">
+            <div class="roll-count rc-present"><div class="rc-val" id="cntPresent">0</div><div class="rc-lbl">Present</div></div>
+            <div class="roll-count rc-absent" ><div class="rc-val" id="cntAbsent">0</div> <div class="rc-lbl">Absent</div></div>
+            <div class="roll-count rc-late"   ><div class="rc-val" id="cntLate">0</div>   <div class="rc-lbl">Late</div></div>
+          </div>
+
+          <!-- Roll table -->
+          <div class="card card-p0" style="overflow:hidden">
+            <div class="table-toolbar justify-between">
+              <span class="fw-6 text-sm">Attendance Roll</span>
+              <div class="input-wrap" style="width:150px">
+                <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input class="form-control" id="rollSearch" placeholder="Search…" style="padding-left:32px;font-size:.78rem"/>
+              </div>
+            </div>
+            <div class="roll-wrap">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>Roll</th><th>Status</th><th>Time</th><th></th></tr></thead>
+                <tbody id="rollBody"><tr><td colspan="5" class="text-center text-muted" style="padding:2rem">No session active</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Session Setup Modal -->
+<div class="modal-overlay hidden" id="sessionModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Start Attendance Session</div>
+      <button class="modal-close" id="cancelModalBtn">✕</button>
+    </div>
+    <div class="setup-fields">
+      <div class="form-group">
+        <label class="form-label">Select Class &amp; Subject <span style="color:var(--red)">*</span></label>
+        <select class="form-control" id="savedClassesSel" required>
+          <option value="">— choose class —</option>
+        </select>
+      </div>
+      <input id="selSubject" type="hidden"/><input id="selClass" type="hidden"/><input id="selSection" type="hidden"/>
+      <div id="classPreviewCard" class="hidden" style="padding:12px;border:1px dashed var(--green);border-radius:var(--r-lg);background:var(--green-dim);font-size:.8125rem">
+        <div class="fw-6 text-green text-xs mb-2" style="text-transform:uppercase;letter-spacing:.05em">Selected Class</div>
+        <div class="flex gap-4 flex-wrap">
+          <span><strong>Subject:</strong> <span id="previewSubject">—</span></span>
+          <span><strong>Class:</strong> <span id="previewClass">—</span></span>
+          <span><strong>Div:</strong> <span id="previewDiv">—</span></span>
+        </div>
+      </div>
+      <div class="fg2">
+        <div class="form-group"><label class="form-label">Teacher Name</label>
+          <input class="form-control" id="selTeacher" value="{{ session.get('name','') }}" readonly style="background:var(--bg);cursor:not-allowed"/>
+        </div>
+        <div class="form-group"><label class="form-label">Late after (min)</label>
+          <input class="form-control" id="selLate" type="number" value="10" min="0" max="60"/>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Session Passcode <span style="color:var(--red)">*</span></label>
+        <input class="form-control" id="selPasscode" placeholder="Share with students" required/>
+      </div>
+      <div class="flex gap-2 mt-2">
+        <button class="btn btn-primary flex-1" id="startSessionBtn">Start Session</button>
+        <button class="btn btn-ghost btn-sm" id="cancelModalBtn2">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script>
+  const CURRENT_USER_NAME = "{{ session.get('name','') }}";
+  const CURRENT_USER_ROLE = "{{ session.get('role','') }}";
+</script>
+<script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+<script src="{{ url_for('static', filename='js/attend.js', v=1.4) }}"></script>
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Manage all registered users in the Offline AI Face Recognition System." />
+  <title>FaceID — Users</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👥</text></svg>" />
+  <style>
+    /* ── Users-specific styles ── */
+    .users-section { padding: 1.5rem 0 3rem; }
+
+    .toolbar {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .search-bar { flex: 1; min-width: 240px; }
+    .filter-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .chip {
+      padding: 0.35rem 0.9rem;
+      border-radius: var(--r-full);
+      font-size: 0.8rem; font-weight: 600;
+      border: 1px solid var(--clr-border);
+      background: var(--clr-surface);
+      color: var(--txt-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chip:hover, .chip.active { background: var(--clr-primary); border-color: var(--clr-primary); color: white; }
+
+    #usersGrid { min-height: 300px; }
+
+    /* User card hover effects */
+    .user-card { animation-delay: calc(var(--i) * 60ms); }
+
+    /* Profile tag chips */
+    .profile-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--r-full);
+      font-size: 0.72rem; font-weight: 600;
+      background: var(--clr-surface-md);
+      color: var(--txt-secondary);
+      border: 1px solid var(--clr-border);
+    }
+
+    /* View Modal */
+    .modal-profile { padding: 0; overflow: hidden; }
+    .modal-profile-hero {
+      height: 220px; position: relative; overflow: hidden;
+      background: linear-gradient(135deg, rgba(124,58,237,0.4), rgba(236,72,153,0.3));
+    }
+    .modal-profile-hero img {
+      width: 100%; height: 100%; object-fit: cover;
+      filter: brightness(0.7);
+    }
+    .modal-profile-hero-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(15,15,46,0.95) 0%, transparent 60%);
+      display: flex; align-items: flex-end; padding: 1.5rem;
+    }
+    .modal-profile-name { font-family: var(--font-display); font-size: 1.8rem; font-weight: 800; color: white; }
+    .modal-profile-body { padding: 1.5rem; }
+    .modal-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .modal-detail-item { }
+    .modal-detail-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--txt-muted); margin-bottom: 3px; }
+    .modal-detail-value { font-size: 0.95rem; font-weight: 600; color: var(--txt-primary); }
+
+    /* Edit form */
+    #editModal .modal { max-width: 580px; }
+
+    /* Confirm delete modal */
+    #deleteModal .modal { max-width: 420px; }
+    .delete-warning { text-align: center; padding: 1.5rem; }
+    .delete-warning-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+
+    /* Stats row */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--clr-surface);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--r-lg);
+      padding: 1.25rem;
+      text-align: center;
+      backdrop-filter: blur(20px);
+      transition: all 0.3s;
+    }
+    .stat-card:hover { border-color: var(--clr-border-hv); transform: translateY(-2px); }
+    .stat-card-val { font-family: var(--font-display); font-size: 2rem; font-weight: 800; background: var(--grad-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .stat-card-label { font-size: 0.78rem; color: var(--txt-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper">
+
+    <!-- ── Navbar ─────────────────────────────────────────── -->
+    <nav class="navbar">
+      <div class="container">
+        <div class="navbar-inner">
+          <a href="/" class="navbar-brand">
+            <div class="brand-icon">🎯</div>
+            <span>FaceID</span>
+          </a>
+          <ul class="nav-links">
+            <li><a href="/" class="nav-link">🏠 Live</a></li>
+            <li><a href="/register" class="nav-link">➕ Register</a></li>
+            <li><a href="/users" class="nav-link active">👥 Users</a></li>
+          </ul>
+          <div class="navbar-actions">
+            <button class="btn-theme" id="themeToggle" title="Toggle theme">🌙</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <main class="container users-section">
+
+      <div class="page-hero" style="padding:1.5rem 0 1.25rem; text-align:left;">
+        <div class="flex items-center justify-between flex-wrap gap-md">
+          <div>
+            <h1 class="page-hero-title" style="font-size:2rem; text-align:left;">👥 Registered Users</h1>
+            <p class="page-hero-subtitle" style="text-align:left;">Manage all faces registered in the local system.</p>
+          </div>
+          <a href="/register" class="btn btn-primary btn-lg">➕ Register New</a>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card">
+          <div class="stat-card-val" id="totalCount">0</div>
+          <div class="stat-card-label">Total Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-val" id="maleCount">0</div>
+          <div class="stat-card-label">Male</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-val" id="femaleCount">0</div>
+          <div class="stat-card-label">Female</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-val" id="cityCount">0</div>
+          <div class="stat-card-label">Cities</div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-bar">
+          <span class="search-bar-icon">🔍</span>
+          <input type="text" class="form-control" id="searchInput"
+            placeholder="Search by name, city, profession, hobby…" />
+        </div>
+        <div class="filter-chips">
+          <span class="chip active" data-filter="all">All</span>
+          <span class="chip" data-filter="Male">Male</span>
+          <span class="chip" data-filter="Female">Female</span>
+        </div>
+        <span class="text-muted text-sm" id="resultCount"></span>
+      </div>
+
+      <!-- Users Grid -->
+      <div class="grid grid-auto" id="usersGrid">
+        <!-- Populated by JS -->
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ── View Profile Modal ──────────────────────────────── -->
+  <div class="modal-backdrop hidden" id="viewModal">
+    <div class="modal glass-card modal-profile" id="viewModalContent">
+      <div class="modal-profile-hero">
+        <img id="viewPhoto" src="" alt="Profile Photo" />
+        <div class="modal-profile-hero-overlay">
+          <div>
+            <div class="modal-profile-name" id="viewName"></div>
+            <div style="color:rgba(255,255,255,0.7); font-size:0.9rem;" id="viewProfession"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-profile-body">
+        <div class="modal-detail-grid" id="viewDetails"></div>
+        <div class="divider"></div>
+        <div class="flex gap-sm justify-between flex-wrap">
+          <button class="btn btn-ghost" id="viewModalClose">✕ Close</button>
+          <div class="flex gap-sm">
+            <button class="btn btn-primary btn-sm" id="viewToEdit">✏️ Edit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Edit Profile Modal ──────────────────────────────── -->
+  <div class="modal-backdrop hidden" id="editModal">
+    <div class="modal glass-card" style="max-width:580px;">
+      <div style="padding:1.5rem; border-bottom:1px solid var(--clr-border);">
+        <div class="flex items-center justify-between">
+          <span class="section-title" style="font-size:1.1rem; margin:0;">✏️ Edit Profile</span>
+          <button class="btn-theme" id="editModalClose">✕</button>
+        </div>
+      </div>
+      <form id="editForm" style="padding:1.5rem;">
+        <input type="hidden" id="editName" />
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Age</label>
+            <input type="number" class="form-control" id="editAge" placeholder="Age" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select class="form-control" id="editGender">
+              <option value="">Select…</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Non-binary">Non-binary</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">City</label>
+            <input type="text" class="form-control" id="editCity" placeholder="City" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Profession</label>
+            <input type="text" class="form-control" id="editProfession" placeholder="Profession" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hobby</label>
+            <input type="text" class="form-control" id="editHobby" placeholder="Hobby" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Favorite Color</label>
+            <input type="text" class="form-control" id="editFavoriteColor" placeholder="Favorite Color" />
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">Welcome Message</label>
+            <input type="text" class="form-control" id="editWelcomeMessage" placeholder="Custom welcome message…" />
+          </div>
+        </div>
+        <div class="flex gap-sm justify-end mt-md">
+          <button type="button" class="btn btn-ghost" id="editCancelBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Delete Confirm Modal ──────────────────────────────── -->
+  <div class="modal-backdrop hidden" id="deleteModal">
+    <div class="modal glass-card" style="max-width:400px;">
+      <div class="delete-warning">
+        <div class="delete-warning-icon">⚠️</div>
+        <h2 class="section-title" style="font-size:1.2rem;">Delete User?</h2>
+        <p class="text-secondary text-sm mt-md mb-lg" id="deleteWarningText">
+          This will permanently delete the profile, photo, and face embedding. This cannot be undone.
+        </p>
+        <div class="flex gap-sm justify-center">
+          <button class="btn btn-ghost" id="deleteCancel">Cancel</button>
+          <button class="btn btn-danger" id="deleteConfirm">🗑️ Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/users.js"></script>
+</body>
+</html>

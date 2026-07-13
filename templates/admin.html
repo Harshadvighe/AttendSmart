@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AttendSmart — Admin Panel</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=1.4) }}"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>"/>
+<style>
+.admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:800px){.admin-grid{grid-template-columns:1fr}}
+.action-danger{background:var(--red-dim);color:var(--red);border:1px solid transparent}
+.action-danger:hover{background:var(--red);color:#fff}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  {% set active_page='admin' %}{% include '_sidebar.html' %}
+  <div class="main-content">
+    {% set page_title='Admin Panel' %}{% include '_topbar.html' %}
+    <main class="page-body">
+      <div class="page-header">
+        <div class="page-title">Administrative Management</div>
+        <div class="page-sub">Manage teacher accounts, classes and assignments</div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="teachers">Teachers</button>
+        <button class="tab-btn"        data-tab="classes">Classes &amp; Assignments</button>
+        <button class="tab-btn"        data-tab="quick">Quick Actions</button>
+      </div>
+
+      <!-- TEACHERS TAB -->
+      <div class="tab-pane active" id="tab-teachers">
+        <div class="admin-grid">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Add Teacher Account</div></div>
+            <form id="addTeacherForm" onsubmit="handleAddTeacher(event)" class="flex-col gap-3">
+              <div class="form-group"><label class="form-label">Full Name</label><input class="form-control" id="teacherName" required placeholder="e.g. Dr. Jane Smith"/></div>
+              <div class="form-group"><label class="form-label">Username</label><input class="form-control" id="teacherUsername" required placeholder="e.g. jsmith"/></div>
+              <div class="form-group"><label class="form-label">Password</label><input class="form-control" type="password" id="teacherPassword" required placeholder="••••••••"/></div>
+              <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
+          </div>
+          <div class="card card-p0">
+            <div class="table-toolbar"><span class="card-title">Registered Teachers</span></div>
+            <div style="overflow-x:auto">
+              <table class="data-table">
+                <thead><tr><th>Name</th><th>Username</th><th></th></tr></thead>
+                <tbody id="teachersBody"><tr><td colspan="3" class="text-center text-muted" style="padding:2rem">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLASSES TAB -->
+      <div class="tab-pane" id="tab-classes">
+        <div class="admin-grid">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Create Class</div></div>
+            <form id="addClassForm" onsubmit="handleAddClass(event)" class="flex-col gap-3">
+              <div class="form-group"><label class="form-label">Subject Name</label><input class="form-control" id="classSubject" required placeholder="e.g. Mathematics"/></div>
+              <div class="fg2">
+                <div class="form-group"><label class="form-label">Class</label>
+                  <select class="form-control" id="classClass" required>
+                    <option value="">— choose —</option><option value="FY">FY</option><option value="SY">SY</option><option value="TY">TY</option>
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Division</label>
+                  <select class="form-control" id="classDiv" required>
+                    <option value="">— choose —</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="V">V</option>
+                  </select>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary">Create Class</button>
+            </form>
+          </div>
+          <div class="card card-p0">
+            <div class="table-toolbar"><span class="card-title">Classes &amp; Assignments</span></div>
+            <div style="overflow-x:auto">
+              <table class="data-table">
+                <thead><tr><th>Class</th><th>Assigned Teacher</th><th></th></tr></thead>
+                <tbody id="classesBody"><tr><td colspan="3" class="text-center text-muted" style="padding:2rem">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS TAB -->
+      <div class="tab-pane" id="tab-quick">
+        <div class="card" style="max-width:500px;margin:0 auto;text-align:center;padding:40px 30px">
+          <div style="font-size:2.5rem;margin-bottom:16px">⚡</div>
+          <div class="card-title mb-2">Quick Navigation</div>
+          <p class="text-muted text-sm mb-6">As administrator you have full access to all system features.</p>
+          <div class="flex-col gap-3" style="max-width:280px;margin:0 auto">
+            <a href="/register" class="btn btn-primary w-full">Enroll New Student</a>
+            <a href="/students" class="btn btn-secondary w-full">Manage Students</a>
+            <a href="/reports"  class="btn btn-secondary w-full">View Attendance Reports</a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Assign Modal -->
+<div class="modal-overlay hidden" id="assignModal">
+  <div class="modal-box modal-sm">
+    <div class="modal-header"><div class="modal-title">Assign Teacher to Class</div><button class="modal-close" onclick="document.getElementById('assignModal').classList.add('hidden')">✕</button></div>
+    <form id="assignForm" onsubmit="handleAssign(event)" class="flex-col gap-3">
+      <input type="hidden" id="assignClassId"/>
+      <div class="form-group"><label class="form-label">Choose Teacher</label>
+        <select class="form-control" id="teacherSelect" required><option value="">Select a teacher…</option></select>
+      </div>
+      <div class="modal-footer" style="padding-top:0;border-top:none;margin-top:0">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('assignModal').classList.add('hidden')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Assign</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin.js', v=1.4) }}"></script>
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+      if(btn.dataset.tab==='teachers') loadTeachers();
+      if(btn.dataset.tab==='classes'){loadClasses();loadTeachersDropdown();}
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AttendSmart — Enroll Student</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=1.4) }}"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>➕</text></svg>"/>
+<style>
+.enroll-layout{display:grid;grid-template-columns:1fr 1.15fr;gap:20px;align-items:start}
+@media(max-width:900px){.enroll-layout{grid-template-columns:1fr}}
+.cam-sticky{position:sticky;top:80px}
+.captured-preview{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:var(--r-xl);border:2px solid var(--green);display:none}
+.countdown-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);border-radius:var(--r-xl);z-index:10;font-size:3.5rem;font-weight:800;color:#fff}
+.success-box{background:var(--green-dim);border:1px solid rgba(16,185,129,.35);border-radius:var(--r-xl);padding:28px;text-align:center;animation:successPop .35s ease}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  {% set active_page='register' %}{% include '_sidebar.html' %}
+  <div class="main-content">
+    {% set page_title='Enroll Student' %}{% include '_topbar.html' %}
+    <main class="page-body">
+      <div class="page-header">
+        <div class="page-title">Enroll New Student</div>
+        <div class="page-sub">Capture a face photo and fill in student details</div>
+      </div>
+
+      <!-- Step wizard -->
+      <div class="step-wizard mb-6">
+        <div class="step-item active" id="sw1"><div class="step-num">1</div><span class="step-txt">Capture Photo</span></div>
+        <div class="step-line"></div>
+        <div class="step-item" id="sw2"><div class="step-num">2</div><span class="step-txt">Fill Details</span></div>
+        <div class="step-line"></div>
+        <div class="step-item" id="sw3"><div class="step-num">3</div><span class="step-txt">Done</span></div>
+      </div>
+
+      <div class="enroll-layout">
+        <!-- Camera -->
+        <div class="cam-sticky">
+          <div class="card card-p0" style="border-radius:var(--r-xl);overflow:hidden">
+            <div id="camSection">
+              <div class="webcam-wrap" id="webcamWrapper">
+                <video id="webcamVideo" class="webcam-video" autoplay playsinline muted></video>
+                <canvas id="webcamCanvas" class="webcam-canvas"></canvas>
+                <div class="webcam-overlay">
+                  <div class="face-ring" id="faceBracket"></div>
+                  <div class="scan-line" id="scanLine"></div>
+                  <div class="cam-corner cc-tl"></div><div class="cam-corner cc-tr"></div>
+                  <div class="cam-corner cc-bl"></div><div class="cam-corner cc-br"></div>
+                </div>
+                <div class="countdown-overlay" id="countdownOverlay"><span id="countdownNum">3</span></div>
+              </div>
+              <div id="capturedWrap" style="padding:10px;display:none">
+                <img id="capturedPreview" class="captured-preview" alt="Captured" style="display:block"/>
+              </div>
+            </div>
+            <div class="cam-controls">
+              <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm" id="startCamBtn">Start Camera</button>
+                <button class="btn btn-success btn-sm hidden" id="captureBtn">📸 Capture (3s)</button>
+                <button class="btn btn-secondary btn-sm hidden" id="retakeBtn">Retake</button>
+              </div>
+              <span class="text-xs text-muted" id="camStatusText">Camera not started</span>
+            </div>
+          </div>
+          <div class="card card-sm mt-3">
+            <div class="fw-6 text-sm mb-2">📌 Tips for a good photo</div>
+            <ul style="font-size:.78rem;color:var(--muted);padding-left:18px;display:flex;flex-direction:column;gap:4px">
+              <li>Good, even lighting on your face</li>
+              <li>Look directly at the camera</li>
+              <li>Only one person in frame</li>
+              <li>No sunglasses or face coverings</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Form -->
+        <div class="card flex-col gap-5" id="formCard">
+          <div class="card-title">Student Information</div>
+
+          <div>
+            <div class="text-xs fw-6 text-subtle mb-3" style="text-transform:uppercase;letter-spacing:.07em">Personal</div>
+            <div class="fg2">
+              <div class="form-group"><label class="form-label">Full Name <span style="color:var(--red)">*</span></label><input class="form-control" id="fName" placeholder="e.g. Rajan Kumar" required/></div>
+              <div class="form-group"><label class="form-label">Student ID <span style="color:var(--red)">*</span></label><input class="form-control" id="fStudentId" placeholder="e.g. CS2024001"/></div>
+              <div class="form-group"><label class="form-label">Password <span style="color:var(--red)">*</span></label><input class="form-control" type="password" id="fPassword" placeholder="Portal password"/></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs fw-6 text-subtle mb-3" style="text-transform:uppercase;letter-spacing:.07em">Academic</div>
+            <div class="fg2">
+              <div class="form-group"><label class="form-label">Class</label>
+                <select class="form-control" id="fYear"><option value="">— choose —</option><option value="FY">FY</option><option value="SY">SY</option><option value="TY">TY</option></select>
+              </div>
+              <div class="form-group"><label class="form-label">Division</label>
+                <select class="form-control" id="fSection"><option value="">— choose —</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="V">V</option></select>
+              </div>
+              <div class="form-group"><label class="form-label">Roll Number</label><input class="form-control" id="fRollNo" placeholder="e.g. 01"/></div>
+              <div class="form-group"><label class="form-label">Department</label><input class="form-control" id="fDept" placeholder="e.g. Computer Science"/></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs fw-6 text-subtle mb-3" style="text-transform:uppercase;letter-spacing:.07em">Contact (optional)</div>
+            <div class="fg2">
+              <div class="form-group"><label class="form-label">Email</label><input class="form-control" type="email" id="fEmail" placeholder="student@college.edu"/></div>
+              <div class="form-group"><label class="form-label">Phone</label><input class="form-control" type="tel" id="fPhone" placeholder="10-digit number"/></div>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid var(--border);padding-top:16px">
+            <button class="btn btn-primary btn-lg btn-full" id="enrollBtn" disabled>Enroll Student</button>
+            <p class="text-xs text-muted text-center mt-2">Capture a photo and fill Name + Student ID to enable enrollment</p>
+          </div>
+
+          <!-- Success -->
+          <div class="success-box hidden" id="successCard">
+            <div style="font-size:2.5rem;margin-bottom:10px">🎉</div>
+            <div class="fw-7 text-lg text-green mb-2" id="successName">Enrolled!</div>
+            <p class="text-sm text-muted mb-4">Student enrolled successfully and ready for face recognition.</p>
+            <div class="flex gap-3 justify-center">
+              <button class="btn btn-secondary btn-sm" id="enrollAnother">Enroll Another</button>
+              <a href="/students" class="btn btn-success btn-sm">View Students</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="toast-container" id="toastContainer"></div>
+<script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+<script src="{{ url_for('static', filename='js/register.js', v=1.4) }}"></script>
+</body>
+</html>
